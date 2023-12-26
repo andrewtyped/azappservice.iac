@@ -10,6 +10,11 @@ variable "resource_group_name" {
     default = "rg-azappsvc-1"
 }
 
+variable "key_vault_name" {
+    type = string
+    default = "kv-azappsvc"
+}
+
 variable "svc_plan_name" {
     type = string 
     description = "This variable defines the app service plan"
