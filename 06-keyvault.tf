@@ -9,17 +9,20 @@ resource "azurerm_key_vault" "azappsvc_keyvault" {
 
     sku_name = "standard"
 
-    access_policy = {
-        tenant_id = data.azurerm_client_config.current.tenant_id
-        object_id = data.azurerm_client_config.current.object_id
+    access_policy = [{
+        tenant_id = data.azuread_client_config.current.tenant_id
+        object_id = data.azuread_client_config.current.object_id
+        application_id = null
 
         key_permissions = ["Get"],
 
-        secret_permissions = ["Get", "Set"],
+        secret_permissions = ["Get", "List", "Set"],
 
         storage_permissions = ["Get"]
-    }
 
-    
+        certificate_permissions = ["Get"]
+    }]
+
+
 }
 

@@ -14,6 +14,8 @@ resource "azuread_service_principal" "azappsvc_deployer_spn" {
     }
 }
 
-resource "azuread_service_principal_password" "azappsvc_deployer_spn_secret" {
-  service_principal_id = azuread_service_principal.azappsvc_deployer_spn.object_id
+resource "azurerm_role_assignment" "azappsvc_resource_group_access" {
+  scope                = "${azurerm_resource_group.rg.id}"
+  role_definition_name = "Contributor"
+  principal_id         = "${azuread_service_principal.azappsvc_deployer_spn.id}"
 }
