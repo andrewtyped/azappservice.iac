@@ -22,6 +22,14 @@ resource "azurerm_subnet"  "subnet" {
     resource_group_name = azurerm_resource_group.rg.name
     virtual_network_name = azurerm_virtual_network.vnet.name
     address_prefixes = ["10.0.0.0/16"]
+    service_endpoints = ["Microsoft.Storage"]
+    delegation {
+      name = "delegation"
+      service_delegation {
+        name = "Microsoft.Web/serverFarms"
+        actions = []
+      }
+    }
 }
 
 resource "azurerm_storage_account" "appstorage" {
@@ -45,12 +53,6 @@ resource "azurerm_storage_account" "appstorage" {
     }
 }
 
-resource "azurerm_storage_container" "app1storagecontainer" {
-    name = "${var.app_name_prefix}-1"
-    storage_account_name = azurerm_storage_account.appstorage.name
-    container_access_type = "private"
-}
-
 resource "time_rotating" "main" {
   rotation_rfc3339 = null
   rotation_years   = 2
@@ -59,6 +61,13 @@ resource "time_rotating" "main" {
     end_date = null
     years    = 2
   }
+}
+
+# WEB APP 1
+resource "azurerm_storage_container" "app1storagecontainer" {
+    name = "${var.app_name_prefix}-1"
+    storage_account_name = azurerm_storage_account.appstorage.name
+    container_access_type = "private"
 }
 
 data "azurerm_storage_account_blob_container_sas" "app1storagecontainer_sas" {
@@ -115,6 +124,91 @@ resource "azurerm_linux_web_app" "app1" {
       http_logs {
         azure_blob_storage {
           sas_url = format("https://${azurerm_storage_account.appstorage.name}.blob.core.windows.net/${azurerm_storage_container.app1storagecontainer.name}%s",data.azurerm_storage_account_blob_container_sas.app1storagecontainer_sas.sas)
+          retention_in_days = 30
+        }
+      }
+    }
+
+    connection_string {
+      name = "StorageAccount"
+      type = "Custom"
+      value = azurerm_storage_account.appstorage.primary_connection_string
+    }
+
+    identity {
+      type = "SystemAssigned"
+    }
+
+    site_config {
+      always_on = true
+      application_stack {
+        dotnet_version = "8.0"
+      }
+    }
+}
+
+
+# WEB APP 2
+resource "azurerm_storage_container" "app2storagecontainer" {
+    name = "${var.app_name_prefix}-2"
+    storage_account_name = azurerm_storage_account.appstorage.name
+    container_access_type = "private"
+}
+
+data "azurerm_storage_account_blob_container_sas" "app2storagecontainer_sas" {
+    connection_string = azurerm_storage_account.appstorage.primary_connection_string
+    container_name = azurerm_storage_container.app2storagecontainer.name
+
+    start = timestamp()
+    expiry = time_rotating.main.rotation_rfc3339
+
+    permissions {
+      read = true
+      write = true
+      add = true
+      create = true
+      delete = true
+      list = true
+    }
+
+    cache_control = "max-age=5"
+    content_disposition = "inline"
+    content_encoding = "deflate"
+    content_language = "en-US"
+    content_type = "application/json"
+}
+
+resource "azurerm_linux_web_app" "app2" {
+    name = "${var.app_name_prefix}-2"
+    resource_group_name = azurerm_resource_group.rg.name
+    location = azurerm_resource_group.rg.location
+    service_plan_id = azurerm_service_plan.svc_plan.id
+    https_only = true
+    public_network_access_enabled = true
+    virtual_network_subnet_id = azurerm_subnet.subnet.id
+    storage_account {
+      name = "WebsiteStorageConnectionString"
+      account_name = azurerm_storage_account.appstorage.name
+      access_key = azurerm_storage_account.appstorage.primary_access_key
+      share_name = azurerm_storage_container.app2storagecontainer.name
+      type = "AzureBlob"
+
+    }
+
+    logs {
+      detailed_error_messages = true
+      failed_request_tracing = true
+      application_logs {
+        azure_blob_storage {
+          level = "Information"
+          sas_url = format("https://${azurerm_storage_account.appstorage.name}.blob.core.windows.net/${azurerm_storage_container.app2storagecontainer.name}%s",data.azurerm_storage_account_blob_container_sas.app2storagecontainer_sas.sas)
+          retention_in_days = 30
+        }
+        file_system_level = "Information"
+      }
+      http_logs {
+        azure_blob_storage {
+          sas_url = format("https://${azurerm_storage_account.appstorage.name}.blob.core.windows.net/${azurerm_storage_container.app2storagecontainer.name}%s",data.azurerm_storage_account_blob_container_sas.app2storagecontainer_sas.sas)
           retention_in_days = 30
         }
       }
